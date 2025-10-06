@@ -1,0 +1,699 @@
+:root {
+  /* Colors */
+  --bg: #F5F5F5; /* 浅灰色背景 */
+  --card: #ffffff;
+  --text: #2c1e1a;
+  --text-secondary: #8c6d62;
+  --muted: #a1887f;
+  --border: #e0d5d1;
+  --primary: #ff6347;
+  --success: #10b981;
+  
+  /* Shadows */
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  /* Animations */
+  --shimmer-duration: 1.5s;
+  --scale-duration: 0.5s;
+  --transition-normal: 0.2s;
+  --transition-slow: 0.3s;
+}
+
+/* Base Styles */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  padding: 0 16px 24px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* Header Styles */
+.hero {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -16px;
+  padding: 24px 16px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 0 0 24px 24px;
+}
+
+.hero .wrap { 
+  max-width: 1120px; 
+  margin: 0 auto; 
+  display: flex; 
+  align-items: flex-end; 
+  justify-content: space-between; 
+  gap: 12px; 
+}
+
+.brand {
+  color: var(--text);
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.brand .sub {
+  margin-top: 6px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* Input and Button Styles */
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar { 
+  display: flex; 
+  gap: 12px; 
+  flex-wrap: wrap; 
+  align-items: center; 
+  margin: 20px 0; 
+  position: relative; /* 为搜索框的绝对定位提供参考 */
+}
+
+/* 确保搜索容器不换行 */
+.toolbar > * {
+  flex-shrink: 0;
+}
+
+/* 搜索模式时的布局调整 */
+.toolbar.search-mode {
+  position: relative;
+}
+
+.toolbar.search-mode > *:not(.search-container):not(.btn-home) {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* 主页按钮在搜索模式时保持正常 */
+.toolbar.search-mode .btn-home {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* 搜索容器保持原位置 */
+.toolbar.search-mode .search-container {
+  position: relative;
+  z-index: 100;
+}
+
+/* 搜索模式时隐藏搜索按钮 */
+.toolbar.search-mode .search-btn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.input, .select {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  outline: none;
+  min-width: 220px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transition: all var(--transition-normal) ease;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.input:focus, .select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 99, 71, 0.1);
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.btn-view {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all var(--transition-normal) ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: auto;
+  font-weight: 500;
+}
+
+.btn-view:hover { 
+  border-color: var(--primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  background: rgba(255, 99, 71, 0.05);
+}
+
+.view-icon {
+  font-size: 18px;
+}
+
+/* Home Button Styles */
+.btn-home {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+  background: linear-gradient(135deg, var(--card) 0%, rgba(255, 99, 71, 0.05) 100%);
+}
+
+.btn-home:hover {
+  background: linear-gradient(135deg, rgba(255, 99, 71, 0.1) 0%, rgba(255, 99, 71, 0.15) 100%);
+  color: var(--primary);
+}
+
+.home-icon {
+  font-size: 16px;
+}
+
+.home-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 响应式设计 - 移动端优化 */
+@media (max-width: 768px) {
+  .toolbar {
+    gap: 8px;
+  }
+  
+  .btn-home .home-text {
+    display: none; /* 移动端隐藏文字，只显示图标 */
+  }
+  
+  .btn-home {
+    min-width: 48px; /* 确保足够的点击区域 */
+    justify-content: center;
+  }
+  
+  .home-icon {
+    font-size: 18px; /* 移动端稍大一些的图标 */
+  }
+}
+
+/* File Time Display */
+.file-time {
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.cover-meta .file-time {
+  display: block;
+  margin-left: 0;
+  margin-top: 4px;
+}
+
+/* Search Container Styles */
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1; /* 允许搜索容器扩展 */
+}
+
+.search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+}
+
+.search-icon {
+  font-size: 16px;
+}
+
+.search-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300px; /* 固定宽度，向右扩展 */
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 768px) {
+  .file-time {
+    font-size: 0.8em;
+  }
+  
+  .search-input {
+    width: 250px; /* 移动端较小的固定宽度 */
+  }
+}
+
+/* Grid Layout */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+/* Card Styles */
+.card { 
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: all var(--transition-slow) ease;
+  position: relative;
+}
+
+.card:hover { 
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 卡片链接基础样式 */
+.card a, .cover-card a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.card a {
+  display: block;
+  padding: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+/* 缩略图样式 */
+.thumb { 
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform var(--transition-normal) ease;
+  flex-shrink: 0;
+}
+
+.thumb:hover {
+  transform: scale(1.1);
+}
+
+/* 有封面的缩略图 */
+.thumb.has-cover {
+  color: transparent;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+/* Typography */
+/* 标题样式 */
+.title, .cover-title { 
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+/* 元数据样式 */
+.meta, .cover-meta { 
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.meta {
+  margin-top: 8px;
+}
+
+.cover-meta {
+  flex-wrap: wrap;
+}
+
+
+
+/* 通用标签样式 */
+.chip, .pill { 
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.chip { 
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--card);
+  font-size: 0.875rem;
+}
+
+.pill { 
+  padding: 4px 10px;
+  background: rgba(255, 99, 71, 0.1);
+  color: var(--primary);
+  border: 1px solid rgba(255, 99, 71, 0.2);
+}
+
+.cover-pill {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
+/* Cover Card Styles */
+.cover-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: all var(--transition-slow) ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.cover-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.cover-card a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.cover-image {
+  width: 100%;
+  height: 280px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--transition-normal) ease;
+}
+
+.cover-image:hover {
+  transform: scale(1.02);
+}
+
+.cover-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 8px 8px 0 0;
+}
+
+.cover-image .fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.cover-info {
+  padding: 16px 18px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cover-title {
+  font-weight: 600;
+  line-height: 1.4;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.cover-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* 下载按钮样式 */
+.download-btn {
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: border-color var(--transition-normal) ease;
+}
+
+.download-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* 列表视图中的下载按钮 */
+.meta .download-btn {
+  font-size: 0.65rem;
+  padding: 1px 4px;
+}
+
+/* Status Indicators */
+.empty {
+  color: var(--muted);
+  padding: 12px;
+  text-align: center;
+}
+
+.download-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  z-index: 20;
+  border-radius: 20px 20px 0 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width var(--transition-normal) ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer var(--shimmer-duration) linear infinite;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: white;
+  display: block;
+  text-align: center;
+  font-weight: 500;
+}
+
+.download-complete-label {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--success);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  z-index: 25;
+  animation: fadeInScale var(--scale-duration) ease;
+}
+
+.card .download-complete-label {
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+/* Skeleton Loading */
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 14px;
+}
+
+.skeleton-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.skeleton-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* 定义骨架屏加载动画基类 */
+[class*="sk-"] {
+  background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
+  background-size: 200% 100%;
+  animation: shimmer var(--shimmer-duration) linear infinite;
+}
+
+.sk-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.sk-line {
+  height: 12px;
+  border-radius: 8px;
+}
+
+.sk-line.w70 {
+  width: 70%;
+}
+
+.sk-line.w40 {
+  width: 40%;
+  margin-top: 8px;
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive Styles */
+@media (max-width: 900px) {
+  /* 网格布局调整为2列 */
+  .grid, .skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  
+  .cover-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (max-width: 620px) {
+  /* 网格布局调整为1列 */
+  .grid, .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* 输入框和选择框宽度调整 */
+  .input, .select {
+    min-width: 160px;
+  }
+  
+  /* 顶部导航栏样式调整 */
+  .hero {
+    position: static;
+    border-bottom: none;
+    border-radius: 0 0 20px 20px;
+  }
+  
+  /* 封面网格调整 */
+  .cover-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+  }
+  
+  .cover-image {
+    height: 220px;
+  }
+}

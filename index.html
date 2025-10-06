@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Library</title>
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="shortcut icon" href="favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <!-- epub.js 用于封面解析（本地纯静态可用） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+</head>
+<body>
+  <div class="hero">
+    <div class="wrap">
+      <div class="brand">
+        <h1>My Library</h1>
+        <div class="sub">快速搜索、排序、继续阅读</div>
+      </div>
+      <div class="actions">
+        <span id="count" class="chip">…</span>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="container">
+    <div class="toolbar">
+      <div class="search-container">
+        <button id="search-btn" class="btn-view search-btn" title="搜索书籍 (按 / 或 F)">
+          <span class="search-icon">🔍</span>
+        </button>
+        <input id="search" class="input search-input" placeholder="搜索书名… (按 ESC 关闭)" style="display:none;" />
+      </div>
+      <select id="sort" class="select">
+        <option value="added-desc">按添加时间 (新→旧)</option>
+        <option value="added-asc">按添加时间 (旧→新)</option>
+        <option value="name-asc">按名称 A→Z</option>
+        <option value="name-desc" selected>按名称 Z→A</option>
+        <option value="recent">按最近阅读</option>
+      </select>
+
+      <button id="view-toggle" class="btn-view" title="切换视图">
+        <span class="view-icon">⊞</span>
+      </button>
+    </div>
+
+    <section>
+      <div id="skeleton" class="skeleton-grid" aria-hidden="true"></div>
+      <div id="book-grid" class="grid" style="display:none;"></div>
+      <div id="empty" class="empty" style="display:none;">书库为空。将 .epub 放入 ebooks/ 并运行脚本同步。</div>
+    </section>
+  </div>
+
+  <!-- 数据来源致谢 -->
+  <footer style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid var(--border, #e6e6e6); color: var(--muted, #666); font-size: 0.75rem;">
+    <p style="margin: 0;">
+      📚 本项目外刊资源基于 
+      <a href="https://github.com/hehonghui/awesome-english-ebooks" target="_blank" rel="noopener" 
+         style="color: var(--primary, #007bff); text-decoration: none; font-weight: 500;">
+        hehonghui/awesome-english-ebooks
+      </a>
+      ，更多外刊资源请访问原项目主页。
+    </p>
+  </footer>
+
+  <script>
+    // 视图模式设置
+    const viewModeKey = 'site:viewMode';
+
+    // 视图模式
+    let currentViewMode = localStorage.getItem(viewModeKey) || 'cover';
+    (function initViewToggle(){
+      const viewToggle = document.getElementById('view-toggle');
+      const viewIcon = viewToggle.querySelector('.view-icon');
+      
+      function updateViewIcon() {
+        viewIcon.textContent = currentViewMode === 'list' ? '⊞' : '≡';
+        viewToggle.title = currentViewMode === 'list' ? '切换到封面视图' : '切换到列表视图';
+      }
+      
+      updateViewIcon();
+      
+      viewToggle.addEventListener('click', ()=>{
+        currentViewMode = currentViewMode === 'list' ? 'cover' : 'list';
+        localStorage.setItem(viewModeKey, currentViewMode);
+        updateViewIcon();
+        render();
+      });
+    })();
+
+    // 从 books_data.json 加载书籍数据
+    let bookFiles = [];
+    let bookInfo = [];
+    
+    // 加载书籍数据
+    async function loadBookData() {
+      try {
+        const response = await fetch('books_data.json');
+        const data = await response.json();
+        
+        // 提取 EPUB 文件
+        const epubFiles = data.files.filter(file => 
+          file.name.toLowerCase().endsWith('.epub')
+        );
+        
+        // 转换为 bookFiles 格式
+        bookFiles = epubFiles.map(file => file.name);
+        
+        // 转换为 bookInfo 格式，使用文件大小作为排序依据
+        bookInfo = epubFiles.map((file, index) => ({
+          filename: file.name,
+          addTime: Date.now() - (index * 1000), // 使用索引创建时间差
+          addTimeISO: new Date(Date.now() - (index * 1000)).toISOString(),
+          size: file.size,
+          downloadUrl: file.download_url
+        }));
+        
+        console.log(`成功加载 ${bookFiles.length} 本电子书`);
+      } catch (error) {
+        console.error('加载书籍数据失败:', error);
+        // 如果加载失败，显示空状态
+        bookFiles = [];
+        bookInfo = [];
+      }
+    }
+
+    const basePath = "./ebooks/";
+    // Service Worker 注册（需 http/https 环境，file:// 无效）
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    }
+    const gridEl = document.getElementById('book-grid');
+    const skeletonEl = document.getElementById('skeleton');
+    const emptyEl = document.getElementById('empty');
+    const searchEl = document.getElementById('search');
+    const sortEl = document.getElementById('sort');
+    const countEl = document.getElementById('count');
+
+    function fileNameToTitle(name) { 
+      if (!name) return '';
+      
+      // 移除 .epub 扩展名
+      let title = name.replace(/\.epub$/i, '');
+      
+      // 处理 TheEconomist 格式，转换为 The Economist
+      title = title.replace(/^TheEconomist\./, 'The Economist ');
+      
+      return title;
+    }
+    function getLastState(bookPath) {
+      try { const raw = localStorage.getItem('reader:lastLocation:' + bookPath); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    }
+    function fmtPercent(p) { if (p==null || isNaN(p)) return ''; const v = Math.max(0, Math.min(100, Math.round(p*100))); return v + '%'; }
+
+    function renderSkeleton(count = 6) {
+      skeletonEl.innerHTML = '';
+      for (let i=0;i<count;i++) {
+        const card = document.createElement('div'); card.className = 'skeleton-card';
+        const row = document.createElement('div'); row.className = 'skeleton-row';
+        const th = document.createElement('div'); th.className = 'sk-thumb';
+        const box = document.createElement('div'); box.style.flex = '1';
+        const l1 = document.createElement('div'); l1.className = 'sk-line w70';
+        const l2 = document.createElement('div'); l2.className = 'sk-line w40';
+        box.appendChild(l1); box.appendChild(l2);
+        row.appendChild(th); row.appendChild(box);
+        card.appendChild(row);
+        skeletonEl.appendChild(card);
+      }
+      skeletonEl.style.display = '';
+      gridEl.style.display = 'none';
+    }
+
+    function clearSkeleton() {
+      skeletonEl.style.display = 'none';
+      gridEl.style.display = '';
+    }
+
+    // 获取文件的添加时间
+    function getFileAddTime(filename) {
+      const fileInfo = bookInfo.find(info => info.filename === filename);
+      return fileInfo ? (fileInfo.addTime || 0) : 0;
+    }
+
+    function render() {
+      const q = (searchEl.value || '').toLowerCase().trim();
+      let items = bookFiles.map((f, index) => {
+        const fileInfo = bookInfo.find(info => info.filename === f);
+        return { 
+        title: fileNameToTitle(f), 
+        file: f, 
+          path: fileInfo?.downloadUrl || (basePath + f), // 使用下载链接或本地路径
+        addedIndex: index, // 用于按添加时间排序（兼容模式）
+          addTime: getFileAddTime(f), // 文件添加时间
+          size: fileInfo?.size || 0 // 文件大小
+        };
+      });
+      const total = items.length;
+      if (q) items = items.filter(it => it.title.toLowerCase().includes(q));
+
+      const sortBy = sortEl.value;
+      if (sortBy === 'name-asc' || sortBy === 'name-desc') {
+        items.sort((a,b) => a.title.localeCompare(b.title, 'zh-Hans-CN'));
+        if (sortBy === 'name-desc') items.reverse();
+      } else if (sortBy === 'recent') {
+        items.sort((a,b) => (getLastState(b.path)?.updatedAt||0) - (getLastState(a.path)?.updatedAt||0));
+      } else if (sortBy === 'added-desc') {
+        // 按添加时间降序（使用文件创建时间）
+        items.sort((a,b) => {
+          if (bookInfo.length > 0 && a.addTime && b.addTime) {
+            return b.addTime - a.addTime; // 按文件创建时间降序
+          } else {
+            return b.addedIndex - a.addedIndex; // 兼容模式：按添加索引降序
+          }
+        });
+      } else if (sortBy === 'added-asc') {
+        // 按添加时间升序（使用文件创建时间）
+        items.sort((a,b) => {
+          if (bookInfo.length > 0 && a.addTime && b.addTime) {
+            return a.addTime - b.addTime; // 按文件创建时间升序
+          } else {
+            return a.addedIndex - b.addedIndex; // 兼容模式：按添加索引升序
+          }
+        });
+      }
+
+      gridEl.className = currentViewMode === 'cover' ? 'cover-grid' : 'grid';
+      gridEl.innerHTML = '';
+      emptyEl.style.display = items.length ? 'none' : 'block';
+      countEl.textContent = `共 ${total} 本 · 显示 ${items.length} 本`;
+
+      items.forEach(it => {
+        const st = getLastState(it.path);
+        const hasProgress = st && typeof st.percentage === 'number';
+        
+        if (currentViewMode === 'cover') {
+          const card = document.createElement('div');
+          card.className = 'cover-card';
+          const link = document.createElement('a');
+          link.href = `reader.html?book=${encodeURIComponent(it.path)}`;
+          
+          const coverImage = document.createElement('div');
+          coverImage.className = 'cover-image';
+          coverImage.innerHTML = '<div class="fallback">EP</div>';
+          
+          // 使用辅助函数创建下载UI
+          const { container: downloadUI } = createDownloadUI();
+          card.appendChild(downloadUI);
+          
+          // 使用辅助函数处理点击事件
+          coverImage.addEventListener('click', (e) => handleCoverClick(e, it.path, card));
+          
+          const coverInfo = document.createElement('div');
+          coverInfo.className = 'cover-info';
+          
+          const coverTitle = document.createElement('div');
+          coverTitle.className = 'cover-title';
+          coverTitle.textContent = it.title;
+          coverTitle.style.cssText = `
+            font-weight: 600;
+            line-height: 1.3;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: var(--text);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-word;
+            min-height: 2.6em;
+          `;
+          
+          const coverMeta = document.createElement('div');
+          coverMeta.className = 'cover-meta';
+          if (hasProgress) {
+            const pill = document.createElement('span');
+            pill.className = 'cover-pill';
+            pill.textContent = fmtPercent(st.percentage);
+            coverMeta.appendChild(pill);
+          }
+          
+          const format = document.createElement('span');
+          format.textContent = '📖 EPUB';
+          coverMeta.appendChild(format);
+          
+          // 添加下载按钮
+          const downloadBtn = document.createElement('button');
+          downloadBtn.className = 'download-btn';
+          downloadBtn.innerHTML = '⬇️ 下载';
+          downloadBtn.title = '下载电子书到本地';
+          downloadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            downloadBook(it.path, it.title);
+          });
+          coverMeta.appendChild(downloadBtn);
+          
+          
+          coverInfo.appendChild(coverTitle);
+          coverInfo.appendChild(coverMeta);
+          link.appendChild(coverImage);
+          link.appendChild(coverInfo);
+          card.appendChild(link);
+          gridEl.appendChild(card);
+          
+          observeCover(it.path, coverImage);
+        } else {
+          // 列表视图
+          const card = document.createElement('div');
+          card.className = 'card';
+          const linkWrap = document.createElement('a');
+          linkWrap.href = `reader.html?book=${encodeURIComponent(it.path)}`;
+
+          const wrap = document.createElement('div');
+          wrap.className = 'row';
+
+           const thumb = document.createElement('div'); 
+           thumb.className = 'thumb'; 
+           thumb.textContent = 'EP';
+           
+           // 使用辅助函数创建下载UI
+           const { container: downloadUI } = createDownloadUI();
+           card.appendChild(downloadUI);
+           
+           // 使用辅助函数处理点击事件
+           thumb.addEventListener('click', (e) => handleCoverClick(e, it.path, card));
+
+          const content = document.createElement('div'); content.style.flex = '1';
+          const title = document.createElement('div'); title.className = 'title'; title.textContent = it.title;
+          const meta = document.createElement('div'); meta.className = 'meta';
+          if (hasProgress) {
+            const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = '继续 ' + fmtPercent(st.percentage);
+            meta.appendChild(pill);
+          }
+          
+          const format = document.createElement('span');
+          format.textContent = '📖 EPUB';
+          meta.appendChild(format);
+          
+          // 添加下载按钮
+          const downloadBtn = document.createElement('button');
+          downloadBtn.className = 'download-btn';
+          downloadBtn.innerHTML = '⬇️ 下载';
+          downloadBtn.title = '下载电子书到本地';
+          downloadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            downloadBook(it.path, it.title);
+          });
+          meta.appendChild(downloadBtn);
+          
+          
+          content.appendChild(title); content.appendChild(meta);
+          wrap.appendChild(thumb); wrap.appendChild(content);
+          linkWrap.appendChild(wrap);
+          card.appendChild(linkWrap);
+          gridEl.appendChild(card);
+          
+          observeCover(it.path, thumb);
+        }
+      });
+
+      clearSkeleton();
+      // 在渲染完成后，检查并更新已下载书籍的UI状态
+      checkDownloadedBooks();
+    }
+
+    // 搜索框展开/收起逻辑
+    (function initSearch() {
+      const searchBtn = document.getElementById('search-btn');
+      const searchInput = document.getElementById('search');
+      const toolbar = document.querySelector('.toolbar');
+      let isSearchOpen = false;
+
+      function openSearch() {
+        if (!isSearchOpen) {
+          isSearchOpen = true;
+          toolbar.classList.add('search-mode');
+          searchInput.style.display = 'block';
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+
+      function closeSearch() {
+        if (isSearchOpen && !searchInput.value.trim()) {
+          isSearchOpen = false;
+          toolbar.classList.remove('search-mode');
+          searchInput.style.display = 'none';
+        }
+      }
+
+      searchBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isSearchOpen) {
+          searchInput.focus();
+        } else {
+          openSearch();
+        }
+      });
+
+      searchInput.addEventListener('blur', () => {
+        setTimeout(closeSearch, 100); // 延迟关闭，避免点击其他元素时立即关闭
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          closeSearch();
+          render(); // 清空搜索时重新渲染
+        }
+      });
+
+      // 导出函数供外部使用
+      window.openSearch = openSearch;
+    })();
+
+    // 快捷键聚焦搜索
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' || e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        window.openSearch();
+      }
+    });
+
+    // 懒加载封面
+    const coverObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries)=>{
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const {path, el} = entry.target.__cover || {};
+          if (path && el) loadCover(path, el);
+          coverObserver.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '100px' }) : null;
+
+    function observeCover(path, el){
+      el.__cover = {path, el};
+      if (coverObserver) coverObserver.observe(el); else loadCover(path, el);
+    }
+
+    // 封面缓存工具
+    const CoverCache = {
+      INDEX_KEY: 'cover:index:v1',
+      DATA_PREFIX: 'cover:data:v1:',
+      TTL_MS: 30 * 24 * 60 * 60 * 1000, // 30 天
+      MAX_ENTRIES: 40,
+
+      // 安全的localStorage操作
+      store: {
+        get(key) {
+          try {
+            return localStorage.getItem(key);
+          } catch {
+            return null;
+          }
+        },
+        set(key, value) {
+          try {
+            localStorage.setItem(key, value);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        remove(key) {
+          try {
+            localStorage.removeItem(key);
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      },
+
+      // 获取封面数据key
+      getKey(path) { 
+        return this.DATA_PREFIX + path; 
+      },
+
+      // 获取索引数据
+      getIndex() {
+        const data = this.store.get(this.INDEX_KEY) || '{}';
+        try {
+          return JSON.parse(data);
+        } catch {
+          return {};
+        }
+      },
+
+      // 更新索引数据
+      setIndex(idx) {
+        this.store.set(this.INDEX_KEY, JSON.stringify(idx));
+      },
+
+      // 获取缓存的封面
+      get(path) {
+        const idx = this.getIndex();
+        const entry = idx[path];
+        if (!entry) return null;
+
+        if ((Date.now() - entry.ts) > this.TTL_MS) {
+          this.remove(path);
+          return null;
+        }
+
+        return this.store.get(this.getKey(path));
+      },
+
+      // 设置封面缓存
+      set(path, dataUrl) {
+        if (this.store.set(this.getKey(path), dataUrl)) {
+          const idx = this.getIndex();
+          idx[path] = { ts: Date.now() };
+          this.setIndex(idx);
+          this.trim();
+          return true;
+        }
+        return false;
+      },
+
+      // 移除封面缓存
+      remove(path) {
+        if (this.store.remove(this.getKey(path))) {
+          const idx = this.getIndex();
+          delete idx[path];
+          this.setIndex(idx);
+          return true;
+        }
+        return false;
+      },
+
+      // 清理过期缓存
+      trim() {
+        const idx = this.getIndex();
+        const entries = Object.entries(idx)
+          .sort((a, b) => b[1].ts - a[1].ts);
+
+        if (entries.length <= this.MAX_ENTRIES) return;
+
+        entries
+          .slice(this.MAX_ENTRIES)
+          .forEach(([path]) => this.remove(path));
+      }
+    };
+
+    // 替换原来的函数调用
+    function getCachedCover(path) {
+      return CoverCache.get(path);
+    }
+
+    function setCachedCover(path, dataUrl) {
+      return CoverCache.set(path, dataUrl);
+    }
+
+    function removeCover(path) {
+      return CoverCache.remove(path);
+    }
+    function blobToDataURL(blob){ return new Promise((res)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); }
+
+    async function loadCover(bookPath, el){
+      const cached = getCachedCover(bookPath);
+      if (cached) { 
+        setCoverImage(el, cached);
+        return; 
+      }
+
+      // 直接从 epub 文件提取封面
+      try {
+        const book = ePub(bookPath);
+        if (typeof book.coverUrl === 'function') {
+          const url = await book.coverUrl();
+          if (url) {
+            setCoverImage(el, url);
+            try{
+              const meta = await book.loaded.metadata; const coverId = meta && (meta.cover || meta.cover_id || meta['cover-id']);
+              if (coverId && book.archive && typeof book.archive.get === 'function') {
+                const blob = await book.archive.get(coverId); if (blob) { const dataUrl = await blobToDataURL(blob); setCachedCover(bookPath, dataUrl); }
+              }
+            }catch{}
+            return;
+          }
+        }
+        const meta = await book.loaded.metadata;
+        const coverId = meta && (meta.cover || meta.cover_id || meta['cover-id']);
+        if (coverId && book && book.archive && typeof book.archive.get === 'function') {
+          const blob = await book.archive.get(coverId);
+          if (blob) {
+            const dataUrl = await blobToDataURL(blob);
+            setCoverImage(el, dataUrl);
+            setCachedCover(bookPath, dataUrl);
+            return;
+          }
+        }
+      } catch(e) { /* 忽略，使用 EP 占位 */ }
+    }
+
+    function setCoverImage(el, imageUrl) {
+      const isCoverImage = el.classList.contains('cover-image');
+      
+      if (isCoverImage) {
+        const fallback = el.querySelector('.fallback');
+        if (fallback) fallback.style.display = 'none';
+        
+        const img = el.querySelector('img') || document.createElement('img');
+        img.src = imageUrl;
+        img.alt = 'Book Cover';
+        if (!el.contains(img)) el.appendChild(img);
+      } else {
+        el.classList.add('has-cover'); 
+        el.style.backgroundImage = `url('${imageUrl}')`;
+      }
+    }
+
+     // 下载功能
+     function startDownload(card, bookPath) {
+       const downloadProgress = card.querySelector('.download-progress');
+       const downloadLabel = card.querySelector('.download-complete-label');
+       const progressFill = downloadProgress.querySelector('.progress-fill');
+       const progressText = downloadProgress.querySelector('.progress-text');
+       
+       downloadProgress.style.display = 'block';
+       downloadLabel.style.display = 'none';
+       
+       let progress = 0;
+       const interval = setInterval(() => {
+         progress += Math.random() * 15 + 5;
+         if (progress >= 100) {
+           progress = 100;
+           clearInterval(interval);
+           
+           progressText.textContent = '下载完成';
+           progressFill.style.width = '100%';
+           
+           setTimeout(() => {
+             downloadProgress.style.display = 'none';
+             downloadLabel.style.display = 'block';
+             
+             const downloadKey = `download:${bookPath}`;
+             localStorage.setItem(downloadKey, JSON.stringify({
+               completed: true,
+               completedAt: Date.now()
+             }));
+           }, 1000);
+         } else {
+           progressText.textContent = `下载中 ${Math.round(progress)}%`;
+           progressFill.style.width = progress + '%';
+         }
+       }, 200 + Math.random() * 300);
+     }
+     
+     // 检查已下载的书籍
+     function checkDownloadedBooks() {
+       document.querySelectorAll('.cover-card, .card').forEach(card => {
+         const link = card.querySelector('a');
+         if (!link?.href.includes('book=')) return;
+         
+         const bookPath = decodeURIComponent(link.href.split('book=')[1]);
+         if (checkDownloadStatus(bookPath)) {
+           const label = card.querySelector('.download-complete-label');
+           if (label) label.style.display = 'block';
+         }
+       });
+     }
+     
+     // UI 创建辅助函数
+    function createDownloadUI() {
+      const container = document.createElement('div');
+      
+      const progress = document.createElement('div');
+      progress.className = 'download-progress';
+      progress.style.display = 'none';
+      progress.innerHTML = `
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 0%"></div>
+        </div>
+        <span class="progress-text">准备下载...</span>
+      `;
+      
+      const label = document.createElement('div');
+      label.className = 'download-complete-label';
+      label.style.display = 'none';
+      label.innerHTML = '✓ 已缓存';
+      
+      container.appendChild(progress);
+      container.appendChild(label);
+      return { container, progress, label };
+    }
+
+    // 下载状态检查辅助函数
+    function checkDownloadStatus(path) {
+      const downloadKey = `download:${path}`;
+      const downloadStatus = localStorage.getItem(downloadKey);
+      let isDownloaded = false;
+      try {
+        if (downloadStatus) {
+          isDownloaded = JSON.parse(downloadStatus).completed === true;
+        }
+      } catch (err) { /* 忽略损坏的数据 */ }
+      return isDownloaded;
+    }
+
+    // 点击处理辅助函数
+    function handleCoverClick(e, path, card) {
+      if (checkDownloadStatus(path)) {
+        return; // 已下载，允许正常跳转
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      startDownload(card, path);
+    }
+
+    // 下载电子书函数
+    function downloadBook(bookPath, bookTitle) {
+      try {
+        // 创建下载链接
+        const link = document.createElement('a');
+        link.href = bookPath;
+        link.download = bookTitle + '.epub';
+        link.style.display = 'none';
+        
+        // 添加到DOM并触发下载
+        document.body.appendChild(link);
+        link.click();
+        
+        // 清理
+        document.body.removeChild(link);
+        
+        // 显示下载成功提示
+        showDownloadNotification('下载已开始', 'success');
+        
+      } catch (error) {
+        console.error('下载失败:', error);
+        showDownloadNotification('下载失败，请重试', 'error');
+      }
+    }
+
+    // 显示下载通知
+    function showDownloadNotification(message, type = 'info') {
+      // 创建通知元素
+      const notification = document.createElement('div');
+      notification.className = `download-notification ${type}`;
+      notification.textContent = message;
+      
+      // 添加样式
+      Object.assign(notification.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        color: 'white',
+        fontWeight: '500',
+        fontSize: '14px',
+        zIndex: '1000',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        transform: 'translateX(100%)',
+        transition: 'transform 0.3s ease'
+      });
+      
+      // 根据类型设置背景色
+      if (type === 'success') {
+        notification.style.background = 'var(--success)';
+      } else if (type === 'error') {
+        notification.style.background = '#ef4444';
+      } else {
+        notification.style.background = 'var(--primary)';
+      }
+      
+      // 添加到页面
+      document.body.appendChild(notification);
+      
+      // 显示动画
+      setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+      }, 100);
+      
+      // 自动隐藏
+      setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            document.body.removeChild(notification);
+          }
+        }, 300);
+      }, 3000);
+    }
+
+    // 添加防抖函数
+    function debounce(fn, delay) {
+      let timer;
+      return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+      };
+    }
+
+    // 使用防抖处理搜索
+    searchEl.addEventListener('input', debounce(render, 300));
+    sortEl.addEventListener('change', render);
+    renderSkeleton(6);
+     
+    // 初始加载和渲染
+    async function initialize() {
+      await loadBookData();
+      render();
+    }
+    
+    // 开始初始化
+    initialize();
+  </script>
+</body>
+</html>
