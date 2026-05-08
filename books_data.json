@@ -1,6 +1,6 @@
 {
-  "generated_time": "2026-05-07 17:33:05",
-  "total_files": 73,
+  "generated_time": "2026-05-08 17:29:54",
+  "total_files": 77,
   "files": [
     {
       "name": "README.md",
@@ -439,6 +439,30 @@
       "download_url": "https://raw.githubusercontent.com/hehonghui/awesome-english-ebooks/master/01_economist/te_2026.05.02/TheEconomist.2026.05.02.pdf",
       "path": "01_economist/te_2026.05.02/TheEconomist.2026.05.02.pdf",
       "size": 8756242
+    },
+    {
+      "name": "README.md",
+      "download_url": "https://raw.githubusercontent.com/hehonghui/awesome-english-ebooks/master/01_economist/te_2026.05.09/README.md",
+      "path": "01_economist/te_2026.05.09/README.md",
+      "size": 1137
+    },
+    {
+      "name": "TheEconomist.2026.05.09.epub",
+      "download_url": "https://raw.githubusercontent.com/hehonghui/awesome-english-ebooks/master/01_economist/te_2026.05.09/TheEconomist.2026.05.09.epub",
+      "path": "01_economist/te_2026.05.09/TheEconomist.2026.05.09.epub",
+      "size": 5984939
+    },
+    {
+      "name": "TheEconomist.2026.05.09.mobi",
+      "download_url": "https://raw.githubusercontent.com/hehonghui/awesome-english-ebooks/master/01_economist/te_2026.05.09/TheEconomist.2026.05.09.mobi",
+      "path": "01_economist/te_2026.05.09/TheEconomist.2026.05.09.mobi",
+      "size": 7279017
+    },
+    {
+      "name": "TheEconomist.2026.05.09.pdf",
+      "download_url": "https://raw.githubusercontent.com/hehonghui/awesome-english-ebooks/master/01_economist/te_2026.05.09/TheEconomist.2026.05.09.pdf",
+      "path": "01_economist/te_2026.05.09/TheEconomist.2026.05.09.pdf",
+      "size": 8331823
     }
   ]
 }
